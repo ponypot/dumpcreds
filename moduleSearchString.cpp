@@ -30,9 +30,6 @@ unsigned long	moduleSearchStringExec(sInfoProcess &infoProcess, const sUserParam
 	unsigned long		nbsCharAfter;
 	unsigned long		nbsResult;
 	unsigned long		findResultInSegment;
-	int			printedResult;
-
-	printedResult = 0;
 
 	/* Pour tout les segments */
 	nbsResult = 0;
@@ -73,15 +70,11 @@ unsigned long	moduleSearchStringExec(sInfoProcess &infoProcess, const sUserParam
 				         (ptrContent[*itItem+patternSize+nbsCharAfter] == '\t'))
 					nbsCharAfter++;
 
-				if (printedResult == 0)
-				{
-					printf("  Strings:\n");
-					printedResult = 1;
-				}
-
+				printModuleName(infoProcess);
 				printf("    %lx: %.*s", *itItem+addrContent, (int)nbsCharBefore, &(ptrContent[*itItem-nbsCharBefore]));
 				printf(COLOR_RED "%.*s" COLOR_NC, (int)patternSize, &(ptrContent[*itItem]));
 				printf("%.*s\n", (int)nbsCharAfter, &(ptrContent[*itItem+strlen(itPattern->c_str())]));
+				
 				nbsResult++;
 				findResultInSegment++;
 

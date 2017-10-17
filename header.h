@@ -98,6 +98,8 @@ public:
 	std::map<unsigned long, sInfoMem*>	listSeg;
 	/** Set contenant les strings extraites des segments RW du processus */
 	std::set<std::string>			listRWStrings;
+	/** Juste pour pouvoir afficher le nom du module grace a son pointeur de fonction */
+	void					*ptrCurrentModule;
 };
 
 
@@ -178,13 +180,18 @@ int		saveSegmentToFile(pid_t pid, const std::string &processName, const sInfoMem
 */
 void		loadDefaultModule(sUserParam &infoParam);
 int		didUserSelectAModule(sUserParam &infoParam, const char *arg, int alreadeyHaveSelectedAModule);
+int		printModuleName(sInfoProcess &infoProcess);
 
 /*
 ** Fonctions d'analyse
 */
 unsigned long	moduleAuthBasicExec(sInfoProcess &infoProcess, const sUserParam &param);
+unsigned long	moduleFTPExec(sInfoProcess &infoProcess, const sUserParam &param);
+unsigned long	moduleParamHttpExec(sInfoProcess &infoProcess, const sUserParam &param);
 unsigned long	moduleSearchStringExec(sInfoProcess &infoProcess, const sUserParam &param);
 unsigned long	moduleShadowExec(sInfoProcess &infoProcess, const sUserParam &param);
+unsigned long	moduleEtcShadowExec(sInfoProcess &infoProcess, const sUserParam &param);
+unsigned long	moduleSmbExec(sInfoProcess &infoProcess, const sUserParam &param);
 unsigned long	moduleStringsExec(sInfoProcess &infoProcess, const sUserParam &param);
 unsigned long	moduleThunderbirdExec(sInfoProcess &infoProcess, const sUserParam &param);
 
@@ -199,6 +206,18 @@ const sInfoModule	tabInfoModule[] =
 		"Extract \"Authorization: Basic Base64=\" credentials from RW segments."
 	},
 	{
+		"FTP", "--ftp", 1,
+		&moduleFTPExec,
+		"Extract \"FTP\" credentials (\"user abc\" and \"pass abc\") from RW segments.\n"
+		"\t\tBy default, it only analyzes \"*ftp*\" processes."
+	},
+	{
+		"Param HTTP", "--param-http", 1,
+		&moduleParamHttpExec,
+		"Extract passwords from URL-style strings from RW segments.\n"
+		"\t\tIt search keywords \"password\", \"passwd\", \"pass\" and \"pwd\"."
+	},
+	{
 		"Patterns", "", 1,
 		&moduleSearchStringExec,
 		"."
@@ -206,8 +225,25 @@ const sInfoModule	tabInfoModule[] =
 	{
 		"Hash shadow", "--shadow", 1,
 		&moduleShadowExec,
-		"Extract hashs at \"/etc/shadow\" format from RW segments.\n"
+		"Extract hashes at \"/etc/shadow\" format from RW segments.\n"
 		"\t\t(Better when launched as root)." 
+	},
+	{
+		"Hash shadow (/etc/shadow)", "--etc-shadow", 1,
+		&moduleEtcShadowExec,
+		"Read \"/etc/shadow\" hashes and search the corresponding passwords in RW segments.\n"
+		"\t\tBy default, it only analyzes the following processes :\n"
+		"\t\t - \"*gdm-session-worker*\"\n"
+		"\t\t - \"*gnome-keyring*\"\n"
+		"\t\t - \"*gnome-shell*\"\n"
+		"\t\t - \"*lightdm*\"\n"
+		"\t\t(Need to be launched as root)." 
+	},
+	{
+		"Samba", "--smb", 1,
+		&moduleSmbExec,
+		"Extract NTMLv2 challenge/response info from RW segments and search the corresponding passwords in memory.\n"
+		"\t\tIt will also display unresolved challenge/response."
 	},
 	{
 		"Strings", "--strings", 0,
@@ -217,8 +253,8 @@ const sInfoModule	tabInfoModule[] =
 	{
 		"Thunderbird", "--thunderbird", 1,
 		&moduleThunderbirdExec,
-		"Extract IMAP \"normal\" authentication password from RW segments.\n"
-		"\t\tBy default, it only analyse \"*mail*\", \"*imap*\" and \"*thunderbird*\" processes."
+		"Extract IMAP \"normal\" authentication passwords from RW segments.\n"
+		"\t\tBy default, it only analyzes \"*mail*\", \"*imap*\" and \"*thunderbird*\" processes."
 	},
 	{
 		NULL, NULL, 0, NULL, NULL

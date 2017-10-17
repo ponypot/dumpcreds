@@ -21,6 +21,7 @@ unsigned long	analyseSegments(sUserParam &userParam, sInfoProcess &infoProcess)
 	     itFunction!=userParam.listFunctions.end();
 	     itFunction++)
 	{
+		infoProcess.ptrCurrentModule = (void*)(*itFunction);
 		nbsResult += (*itFunction)(infoProcess, userParam);
 	}
 
@@ -76,7 +77,6 @@ int	main(int argc, const char **argv)
 	}
 
 	/* Traite tout les processus */
-	nbsResult = 0;
 	for (std::set<pid_t>::const_iterator itPid=userParam.listPid.begin();
 	     itPid!=userParam.listPid.end();
 	     itPid++)

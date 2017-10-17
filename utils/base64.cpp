@@ -13,27 +13,26 @@
 ** \param resultSize Taille du buffer de destination
 ** \return Retourne 1 si OK, -1 sinon
 */
-int	base64encode(const void* data_buf, unsigned long dataLength, char* result, unsigned long resultSize)
+int	base64encode(const void* data, unsigned long dataLength, char* result, unsigned long resultSize)
 {
 	const char	base64chars[]	= "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-	const uint8_t	*data		= (const uint8_t *)data_buf;
-	unsigned long		resultIndex 	= 0;
-	unsigned long		x;
+	const uint8_t	*ptrData	= (const uint8_t *)data;
+	unsigned long	resultIndex 	= 0;
 	uint32_t	n		= 0;
 	int		padCount	= dataLength % 3;
 	uint8_t 	n0, n1, n2, n3;
 
 	/* increment over the length of the string, three characters at a time */
-	for (x = 0; x < dataLength; x += 3) 
+	for (unsigned long x=0; x<dataLength; x+=3) 
 	{
 		/* these three 8-bit (ASCII) characters become one 24-bit number */
-		n = ((uint32_t)data[x]) << 16; //parenthesis needed, compiler depending on flags can do the shifting before conversion to uint32_t, resulting to 0
+		n = ((uint32_t)ptrData[x]) << 16;
 		
 		if((x+1) < dataLength)
-			n += ((uint32_t)data[x+1]) << 8;//parenthesis needed, compiler depending on flags can do the shifting before conversion to uint32_t, resulting to 0
+			n += ((uint32_t)ptrData[x+1]) << 8;
 		
 		if((x+2) < dataLength)
-			n += data[x+2];
+			n += ptrData[x+2];
 
 		/* this 24-bit number gets separated into four 6-bit numbers */
 		n0 = (uint8_t)(n >> 18) & 63;
@@ -45,21 +44,21 @@ int	base64encode(const void* data_buf, unsigned long dataLength, char* result, u
 		 * if we have one byte available, then its encoding is spread
 		 * out over two characters
 		 */
-		if(resultIndex >= resultSize)
-			return -1;	/* indicate failure: buffer too small */
+		if (resultIndex >= resultSize)
+			return (-1);
 		result[resultIndex++] = base64chars[n0];
-		if(resultIndex >= resultSize)
-			return -1;	/* indicate failure: buffer too small */
+		if (resultIndex >= resultSize)
+			return (-1);
 		result[resultIndex++] = base64chars[n1];
 
 		/*
 		 * if we have only two bytes available, then their encoding is
 		 * spread out over three chars
 		 */
-		if((x+1) < dataLength)
+		if ((x+1) < dataLength)
 		{
-			if(resultIndex >= resultSize)
-				return 1;	/* indicate failure: buffer too small */
+			if (resultIndex >= resultSize)
+				return (-1);
 			result[resultIndex++] = base64chars[n2];
 		}
 
@@ -67,31 +66,30 @@ int	base64encode(const void* data_buf, unsigned long dataLength, char* result, u
 		 * if we have all three bytes available, then their encoding is spread
 		 * out over four characters
 		 */
-		if((x+2) < dataLength)
+		if ((x+2) < dataLength)
 		{
-			if(resultIndex >= resultSize)
-				return -1;	/* indicate failure: buffer too small */
+			if (resultIndex >= resultSize)
+				return (-1);
 			result[resultIndex++] = base64chars[n3];
 		}
 	}  
 
-	/*
-	* create and add padding that is required if we did not have a multiple of 3
-	* number of characters available
-	*/
+	/* Ajoute le padding si besoin est */
 	if (padCount > 0) 
 	{ 
-		for (; padCount < 3; padCount++) 
+		for (; padCount<3; padCount++) 
 		{ 
-			if(resultIndex >= resultSize)
-				return -1;	/* indicate failure: buffer too small */
+			if (resultIndex >= resultSize)
+				return (-1);
 			result[resultIndex++] = '=';
 		} 
 	}
-	if(resultIndex >= resultSize)
-		return -1;	/* indicate failure: buffer too small */
-	result[resultIndex] = 0;
-	return 1;	/* indicate success */
+	
+	/* Ajoute le caractere de fin de chaine */
+	if (resultIndex >= resultSize)
+		return (-1);
+	result[resultIndex] = '\0';
+	return (1);
 }
 
 
@@ -143,7 +141,7 @@ int	base64decode(const char *in, unsigned long inLen, unsigned char *out, unsign
 			case WHITESPACE:	/* skip whitespace */
 				continue;	
 			case INVALID:		/* invalid input, return error */
-				return -1;
+				return (-1);
 			case EQUALS:		/* pad character, end of data */
 				in = end;
 				continue;
@@ -166,17 +164,17 @@ int	base64decode(const char *in, unsigned long inLen, unsigned char *out, unsign
 	if (iter == 3)
 	{
 		if ((len += 2) > *outLen)
-			return -1; /* buffer overflow */
+			return (-1); /* buffer overflow */
 		*(out++) = (buf >> 10) & 255;
 		*(out++) = (buf >> 2) & 255;
 	}
 	else if (iter == 2)
 	{
 		if (++len > *outLen)
-			return -1; /* buffer overflow */
+			return (-1); /* buffer overflow */
 		*(out++) = (buf >> 4) & 255;
 	}
 
 	*outLen = len; /* modify to reflect the actual output size */
-	return 1;
+	return (1);
 }

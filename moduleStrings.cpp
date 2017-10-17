@@ -16,9 +16,6 @@ unsigned long	moduleStringsExec(sInfoProcess &infoProcess, const sUserParam &/*p
 	unsigned long	sizeContent;
 	unsigned long	addrContent;
 	unsigned long	nbsChar;
-	int		printedResult;
-
-	printedResult = 0;
 
 	/* Pour tout les segments */
 	for (std::map<unsigned long, sInfoMem*>::const_iterator itSeg=infoProcess.listSeg.begin();
@@ -42,12 +39,7 @@ unsigned long	moduleStringsExec(sInfoProcess &infoProcess, const sUserParam &/*p
 					nbsChar = countPrintableChar(ptrContent, sizeContent, offset);
 					if (nbsChar > SIZE_STRING_MIN)
 					{
-						if (printedResult == 0)
-						{
-							printf("  Strings:\n");
-							printedResult = 1;
-						}
-
+						printModuleName(infoProcess);
 						printf("    %lx: %.*s\n", addrContent+offset, (int)nbsChar, &(ptrContent[offset]));
 						offset += nbsChar;
 					}

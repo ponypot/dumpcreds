@@ -74,8 +74,7 @@ unsigned long	moduleAuthBasicExec(sInfoProcess &infoProcess, const sUserParam &p
 					/* Affiche le pass si le pattern semble valide */
 					if (ok == 1)
 					{
-						if (nbsResult == 0)
-							printf("  Basic Auth:\n");
+						printModuleName(infoProcess);
 
 						printf("    %lx: %.*s", *itItem+addrContent,
 							(int)(sizePattern+nbsSpace), &(ptrContent[*itItem]));

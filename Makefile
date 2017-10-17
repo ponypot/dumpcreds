@@ -9,8 +9,11 @@ SRC=	main.cpp \
 	utils/md5.cpp \
 	\
 	moduleAuthBasic.cpp \
+	moduleFTP.cpp \
+	moduleParamHttp.cpp \
 	moduleSearchString.cpp \
 	moduleShadow.cpp \
+	moduleSmb.cpp \
 	moduleStrings.cpp \
 	moduleThunderbird.cpp
 OBJ=	$(SRC:.cpp=.o)
@@ -20,7 +23,7 @@ CXX=		g++
 CXXLIBS=	-lcrypt
 CXXFLAGS=	-W -Wall -Wextra
 #CXXFLAGS+=	-static	# Pour pouvoir fonctionner sur les systemes ou les libs ne sont pas installees
-#CXXFLAGS+=	-O2	# Roarrr
+CXXFLAGS+=	-O2	# Roarrr
 
 
 all: $(BIN)

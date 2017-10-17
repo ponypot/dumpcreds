@@ -1,11 +1,25 @@
 #include	"header.h"
 
 
+/**
+** \struct sInfoHash
+** \param Structure contenant les infos des hashs
+*/
+struct	sInfoHash
+{
+	/** Hash */
+	std::string	hash;
+	/** Mot de passe corespondant au hash (si on le trouvre, "" sinon) */
+	std::string	password;
+	/** Nom de l'utilisateur (si on le connait ("" sinon) */
+	std::string	username;
+};
 
-static unsigned long	searchShadowHash(std::set<std::string> &dst,
+static unsigned long	searchShadowHash(std::map<std::string, sInfoHash> &dst,
 					std::map<unsigned long, sInfoMem*>::const_iterator &itSeg);
-static unsigned long	searchHashString(sInfoProcess &infoProcess, std::set<std::string> &hash);
-
+static unsigned long	getHashFromEtcShadow(std::map<std::string, sInfoHash> &dst);
+static unsigned long	searchHashString(sInfoProcess &infoProcess, std::map<std::string, sInfoHash> &hash);
+static void		printHashInfo(std::map<std::string, sInfoHash>::iterator &info, sInfoProcess &infoProcess);
 
 
 /**
@@ -20,7 +34,7 @@ unsigned long	moduleShadowExec(sInfoProcess &infoProcess, const sUserParam &para
 {
 	unsigned long				nbsResult;
 	unsigned long				findResultInSegment;
-	std::set<std::string>			listHash;
+	std::map<std::string, sInfoHash>	listHash;
 
 	/* Pour tout les segments */
 	nbsResult = 0;
@@ -55,7 +69,39 @@ unsigned long	moduleShadowExec(sInfoProcess &infoProcess, const sUserParam &para
 }
 
 /**
-** \fn unsigned long searchShadowHash(std::set<std::string> &dst,
+** \fn unsigned long moduleEtcShadowExec(sInfoProcess &infoProcess, const sUserParam &param)
+** \brief Extrait les hashs de "/etc/shadow" et cherche les pass correspondants dans les segments RW
+** 
+** \param infoProcess Structure contenant les infos du processus a analyser
+** \param param Structure contenant les options utilisateurs
+** \return Retourne le nombre de hashs trouves
+*/
+unsigned long	moduleEtcShadowExec(sInfoProcess &infoProcess, const sUserParam &param)
+{
+	std::map<std::string, sInfoHash>	listHash;
+	unsigned long				nbsResult;
+
+	/* Si le mode "--force" n'est pas actif, on ne traite que certains processus */
+	if ( (param.force == 0) &&
+	     (strcasestr(infoProcess.name.c_str(), "gdm-session-worker") == NULL) &&
+	     (strcasestr(infoProcess.name.c_str(), "gnome-keyring") == NULL) &&
+	     (strcasestr(infoProcess.name.c_str(), "gnome-shell") == NULL) &&
+	     (strcasestr(infoProcess.name.c_str(), "lightdm") == NULL) )
+		return (0);
+
+	/* Si on peut recuperer des hashs dans "/etc/shadow" */
+	nbsResult = 0;
+	if (getHashFromEtcShadow(listHash) > 0)
+	{
+		/* On tente de trouver le pass correspondant */
+		nbsResult = searchHashString(infoProcess, listHash);
+	}
+
+	return (nbsResult);
+}
+
+/**
+** \fn unsigned long searchShadowHash(std::map<std::string, sInfoHash> &dst,
 **				std::map<unsigned long, sInfoMem*>::const_iterator &itSeg)
 ** \brief Gere l'identification des hash au format '/etc/shadow' situe en memoire
 **
@@ -63,13 +109,17 @@ unsigned long	moduleShadowExec(sInfoProcess &infoProcess, const sUserParam &para
 ** \param itSeg Information du segment en cours d'analyse
 ** \return Retourne le nombre de hash trouves
 */
-static unsigned long	searchShadowHash(std::set<std::string> &dst,
+static unsigned long	searchShadowHash(std::map<std::string, sInfoHash> &dst,
 					std::map<unsigned long, sInfoMem*>::const_iterator &itSeg)
 {
 	unsigned long	nbsHashInSeg;
 	const char	*tabIdentHash[] =
 	{
 		"$1$", "$2a$", "$5$", "$6$", NULL
+	};
+	unsigned long	tabSizeHash[] =
+	{
+		22,    0,      43,    86,    0
 	};
 	std::set<unsigned long>	listItem;
 	const char		*ptrContent;
@@ -78,7 +128,7 @@ static unsigned long	searchShadowHash(std::set<std::string> &dst,
 	unsigned long		sizeSalt;
 	unsigned long		sizeHash;
 	int			ok;
-	char			bufferHashTmp[1024];
+	sInfoHash		infoHashTmp;
 
 	//dst.clear();
 	nbsHashInSeg = 0;
@@ -114,16 +164,17 @@ static unsigned long	searchShadowHash(std::set<std::string> &dst,
 				sizeHash = 0;
 				while (myIsShadowChar(ptrContent[*itItem+patternSize+sizeSalt+sizeHash]))
 					sizeHash++;
-				if (sizeHash < 5)
+				if ((tabSizeHash[indexTypeHash] > 0) && (sizeHash != tabSizeHash[indexTypeHash]))
 					ok = 0;
 
 				/* Si on a trouve un hash, on l'ajoute a la liste */
 				if ((ok == 1) && ((patternSize + sizeSalt + sizeHash) < 1023))
 				{
-					memcpy(bufferHashTmp, &(ptrContent[*itItem]), (patternSize + sizeSalt + sizeHash));
-					bufferHashTmp[patternSize + sizeSalt + sizeHash] = '\0';
+					infoHashTmp.hash = std::string(&(ptrContent[*itItem]), (patternSize + sizeSalt + sizeHash));
+					infoHashTmp.password = "";
+					infoHashTmp.username = "";
 
-					dst.insert(bufferHashTmp);
+					dst[infoHashTmp.hash] = infoHashTmp;
 					nbsHashInSeg++;
 				}
 			}
@@ -134,44 +185,91 @@ static unsigned long	searchShadowHash(std::set<std::string> &dst,
 }
 
 /**
-** \fn unsigned long searchHashString(sInfoProcess &infoProcess, std::set<std::string> &hash)
+** \fn unsigned long getHashFromEtcShadow(std::map<std::string, sInfoHash> &dst)
+** \brief Recupere les hashs presents dans "/etc/shadow"
+**
+** \param dst Liste ou mettre les infos des hashs
+** \return Retourne le nombre de hashs recuperes
+*/
+static unsigned long	getHashFromEtcShadow(std::map<std::string, sInfoHash> &dst)
+{
+	std::ifstream	file("/etc/shadow");
+	std::string	line;
+	std::string	nameTmp;
+	std::string	hashTmp;
+	unsigned long	offsetTmp;
+	unsigned long	offsetTmp2;
+	sInfoHash	infoHashTmp;
+
+	dst.clear();
+	
+	if (file)
+	{
+		while (std::getline(file, line))
+		{
+			/* Recupere le username */
+			if ((offsetTmp = line.find(":")) != std::string::npos)
+			{
+				nameTmp = line.substr(0, offsetTmp);
+				offsetTmp++;
+				
+				/* Recupere le hash */
+				if ((offsetTmp2 = line.find(":", offsetTmp)) != std::string::npos)
+				{
+					hashTmp = line.substr(offsetTmp, offsetTmp2-offsetTmp);
+					
+					/* Si le hash a un magic correct, on l'insere dans la liste */
+					if ( (dst.find(hashTmp) == dst.end()) &&
+					     ((hashTmp.find("$1$") == 0) ||
+					      (hashTmp.find("$2a$") == 0) ||
+					      (hashTmp.find("$5$") == 0) ||
+					      (hashTmp.find("$6$") == 0)) )
+					{
+						infoHashTmp.hash = hashTmp;
+						infoHashTmp.password = "";
+						infoHashTmp.username = nameTmp;
+						dst[hashTmp] = infoHashTmp;
+					}
+				}
+			}
+		}
+	}
+
+	return (dst.size());
+}
+
+/**
+** \fn unsigned long searchHashString(sInfoProcess &infoProcess, std::map<std::string, sInfoHash> &hash)
 ** \brief Cherche les chaines de caracteres ayant servies a generer les hashs
 **
 ** \param infoProcess Structure contenant les infos du processus a analyser
 ** \param hash Liste des hashs
-** \return Retourne le nombre de nombre de correspondance hash/pass trouvee
+** \return Retourne le nombre de nombre de correspondances hash/pass trouvees
 */
-static unsigned long	searchHashString(sInfoProcess &infoProcess, std::set<std::string> &hash)
+static unsigned long	searchHashString(sInfoProcess &infoProcess, std::map<std::string, sInfoHash> &hash)
 {
-	std::map<std::string, std::string>	mapHashAndPass;
-	char					bufferSalt[1024];
-	unsigned long				nbsDollars;
-	char					*hashTmp;
-	int					printedResult;
+	unsigned long	nbsResult;
+	char		bufferSalt[1024];
+	unsigned long	nbsDollars;
+	char		*hashTmp;
+	int		ok;
 
-	printedResult = 0;
-
-	/* Prepare la map de resultat */
-	for (std::set<std::string>::const_iterator itHash=hash.begin();
-	     itHash!=hash.end();
-	     itHash++)
-	{
-		mapHashAndPass[*itHash] = "";
-	}
+	nbsResult = 0;
 
 	/* On recupere toutes les chaines de caracteres des segments RW */
 	getEveryRWStrings(infoProcess);
 
 	/* Pour tout les hashs */
-	for (std::set<std::string>::iterator itHash=hash.begin();
-	     itHash!=hash.end();
-	     itHash++)
+	for (std::map<std::string, sInfoHash>::iterator itHash=hash.begin();
+	     itHash!=hash.end(); )
 	{
+		ok = 0;
+
 		/* Prepare le salt devant servir a hasher les chaines */
 		nbsDollars = 0;
-		for (unsigned long i=0; ((*itHash)[i]!='\0') && (nbsDollars<3); i++)
+		for (unsigned long i=0; (itHash->first.c_str()[i]!='\0') && (nbsDollars<3); i++)
 		{
-			bufferSalt[i] = (*itHash)[i];
+			bufferSalt[i] = itHash->first.c_str()[i];
 			bufferSalt[i+1] = '\0';
 
 			if (bufferSalt[i] == '$')
@@ -186,47 +284,62 @@ static unsigned long	searchHashString(sInfoProcess &infoProcess, std::set<std::s
 			hashTmp = crypt(itStr->c_str(), bufferSalt);
 
 			/* Si le hash calcule correspond a celui de la liste */
-			if (*itHash == hashTmp)
+			if (itHash->first == hashTmp)
 			{
-				if (printedResult == 0)
-				{
-					printf("  Hash shadow:\n");
-					printedResult = 1;
-				}
+				/* Si on a trouve le pass, on l'affiche */
+				itHash->second.password = (*itStr);
+				printHashInfo(itHash, infoProcess);
 
-				/* Si on a trouve le pass, on l'ajoute a la liste et on l'affiche */
-				mapHashAndPass[hashTmp] = (*itStr);
-
-				printf("    Hash: " 
-					COLOR_RED "%s" COLOR_NC 
-					" = \"" 
-					COLOR_RED "%s" COLOR_NC "\"\n",
-					itHash->c_str(), itStr->c_str());
-
+				ok = 1;
+				itHash = hash.erase(itHash++);
 				itStr = infoProcess.listRWStrings.end();
+				nbsResult++;
 			}
 			else
 				itStr++;
 		}
+		
+		/* Passe au hase suivant si besoin est */
+		if (ok == 0)
+			itHash++;
 	}
 
 	/* Affiche les hashs sans correspondances */
-	for (std::map<std::string, std::string>::const_iterator itHash=mapHashAndPass.begin();
-	     itHash!=mapHashAndPass.end();
+	for (std::map<std::string, sInfoHash>::iterator itHash=hash.begin();
+	     itHash!=hash.end();
 	     itHash++)
 	{
-		if (itHash->second.size() <= 0)
-		{
-			if (printedResult == 0)
-			{
-				printf("  Hash shadow:\n");
-				printedResult = 1;
-			}
-
-			printf("    Hash: " COLOR_RED "%s" COLOR_NC "\n", itHash->first.c_str());
-		}
+		printHashInfo(itHash, infoProcess);
 	}
 
-	return (mapHashAndPass.size());
+	return (nbsResult);
+}
+
+/**
+** \fn void printHashInfo(std::map<std::string, sInfoHash>::iterator &info, sInfoProcess &infoProcess)
+** \brief Gere l'affichage des infos d'un hash
+**
+** \param info Hash a afficher
+** \param infoProcess Structure contenant les infos du processus a analyser
+** \return Retourne rien
+*/
+static void	printHashInfo(std::map<std::string, sInfoHash>::iterator &info, sInfoProcess &infoProcess)
+{
+	/*
+	** S'il y a un nom mais pas de pass, c'est que le hash viens de "/etc/shadow" :
+	** On ne l'affiche que si on a trouve le password
+	*/
+	if ((info->second.username.size() <= 0) || (info->second.password.size() > 0))
+	{
+		printModuleName(infoProcess);
+		printf("    Hash: " COLOR_RED "%s" COLOR_NC, info->second.hash.c_str());
+		
+		if (info->second.password.size() > 0)
+			printf(" = \"" COLOR_RED "%s" COLOR_NC "\"", info->second.password.c_str());
+		if (info->second.username.size() > 0)
+			printf(" (%s)", info->second.username.c_str());
+			
+		printf("\n");
+	}
 }
 

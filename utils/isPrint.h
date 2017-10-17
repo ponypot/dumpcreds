@@ -85,5 +85,11 @@ const unsigned char	tabIsprint[256] =
 #define myIsEmailChar(c) ((isalnum(c) || (c == '.') || (c == '-') || (c == '_') || (c == '@')) ? 1 : 0)
 #define myIsEmailNameChar(c) ((isalnum(c) || (c == '.') || (c == '-') || (c == '_')) ? 1 : 0)
 
+/*
+** Identifie les caracteres pouvant etre presents dans un parametre HTTP
+*/
+#define myParamHTTPChar(c) ((isalnum(c) || (c == '%') || (c == '-') || (c == '.') || (c == '_') || \
+			    (c == '~') || (c == '!') || (c == '(') || (c == ')') || (c == '*')) ? 1 : 0)
+
 #endif
 

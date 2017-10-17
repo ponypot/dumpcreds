@@ -1,7 +1,14 @@
 #include	"header.h"
 #include	"utils/base64.h"
 
+/*
+** Pattern servant a identifier les adresses mails ICMP
+*/
 #define	PATTERN_IMAP	"imap://"
+
+
+
+static unsigned long	searchICMPPassword(std::set<std::string> &setEmailICMP, sInfoProcess &infoProcess);
 
 
 
@@ -22,11 +29,9 @@ unsigned long	moduleThunderbirdExec(sInfoProcess &infoProcess, const sUserParam 
 	unsigned long		patternSize;
 	std::set<unsigned long>	listItem;
 	unsigned long		sizeEmail;
-	std::set<std::string>	setEmail;
-	char			bufferStrTmp[1024];
-	char			bufferStrBase64[1024*2];
-	unsigned long		nbsChar;
-	int			ok;
+	std::string		emailTmp;
+	unsigned long		offsetTmp;
+	std::set<std::string>	setEmailICMP;
 
 	/* 
 	** Si le mode "--force" n'est pas actif,
@@ -54,44 +59,77 @@ unsigned long	moduleThunderbirdExec(sInfoProcess &infoProcess, const sUserParam 
 
 			/* Cherche les "imap://" (imap://test@mail.pony.com/INBOX) */
 			searchStringI(listItem, ptrContent, sizeContent, 0, PATTERN_IMAP);
-
-			/* Extrait les adresses mails */
 			for (std::set<unsigned long>::iterator itItem=listItem.begin();
 			     itItem!=listItem.end();
 			     itItem++)
 			{
+				/*
+				** Extrait les adresses mails :
+				** imap://test@mail.pony.com/INBOX
+				** imap://test%40mail.pony.com@test.com/INBOX
+				*/
 				sizeEmail = 0;
-				while (myIsEmailChar(ptrContent[*itItem + patternSize + sizeEmail]))
+				while ( (myIsEmailChar(ptrContent[*itItem + patternSize + sizeEmail])) ||
+				        ((ptrContent[*itItem + patternSize + sizeEmail] == '%') &&
+				         (ptrContent[*itItem + patternSize + sizeEmail + 1] == '4') &&
+				         (ptrContent[*itItem + patternSize + sizeEmail + 2] == '0')) )
 					sizeEmail++;
 
 				if ((sizeEmail > 3) && (sizeEmail < 1024) &&
 				    (memchr(&(ptrContent[*itItem + patternSize]), '@', sizeEmail) != NULL))
 				{
-					memcpy(bufferStrTmp, &(ptrContent[*itItem + patternSize]), sizeEmail);
-					bufferStrTmp[sizeEmail] = '\0';
-					setEmail.insert(bufferStrTmp);
+					/* extrait l'adresse email et remplace les "%40" par "@" */
+					emailTmp = std::string(&(ptrContent[*itItem + patternSize]), sizeEmail);
+					while ((offsetTmp = emailTmp.find("%40")) != std::string::npos)
+						emailTmp.replace(offsetTmp, 3, "@");
 
+					setEmailICMP.insert(emailTmp);
 					findResultInSegment = 1;
-
-					/* Cree le fichier de dump si besoin est */
-					if ((findResultInSegment > 0) && (param.dump != 0))
-					{
-						saveSegmentToFile(infoProcess.pid, infoProcess.name, itSeg->second);
-					}
 				}
 			}
 		}
+
+		/* Cree le fichier de dump si besoin est */
+		if ((findResultInSegment > 0) && (param.dump != 0))
+		{
+			saveSegmentToFile(infoProcess.pid, infoProcess.name, itSeg->second);
+		}
 	}
 
+	/* Recherche des mots de passe correspondants aux adresses mail ICMP */
+	nbsResult += searchICMPPassword(setEmailICMP, infoProcess);
+
+	return (nbsResult);
+}
+
+/**
+** \fn unsigned long searchICMPPassword(std::set<std::string> &setEmailICMP, sInfoProcess &infoProcess)
+** \brief Gere la recherche des passwordd des adresses mail ICMP
+**
+** \param setEmailICMP Liste d'adresses ICMP
+** \param infoProcess Structure contenant les infos du processus a analyser
+** \return Retourne le nombre de pass trouves
+*/
+static unsigned long	searchICMPPassword(std::set<std::string> &setEmailICMP, sInfoProcess &infoProcess)
+{
+	unsigned long	nbsResult;
+	unsigned long	sizeEmail;
+	char		bufferStrTmp[1024];
+	char		bufferStrBase64[1024*2];
+	unsigned long	nbsChar;
+	unsigned long	offsetTmp;
+	int		ok;
+
 	/* Si on a des emails, on a besoin des chaines pour tenter de trouver le password */
-	if (setEmail.size() > 0)
+	if (setEmailICMP.size() > 0)
 	{
 		getEveryRWStrings(infoProcess);
 	}
 
 	/* Pour toutes les adresses email */
-	for (std::set<std::string>::iterator itEmail=setEmail.begin();
-	     itEmail!=setEmail.end(); )
+	nbsResult = 0;
+	for (std::set<std::string>::iterator itEmail=setEmailICMP.begin();
+	     itEmail!=setEmailICMP.end(); )
 	{
 		ok = 0;
 
@@ -100,10 +138,10 @@ unsigned long	moduleThunderbirdExec(sInfoProcess &infoProcess, const sUserParam 
 		bufferStrTmp[0] = '\0';
 
 		sizeEmail = 0;
-		while (myIsEmailNameChar((*itEmail)[sizeEmail]))
+		if ((offsetTmp = itEmail->find_last_of("@")) != std::string::npos)
 		{
-			bufferStrTmp[1+sizeEmail] = (*itEmail)[sizeEmail];
-			sizeEmail++;
+			memcpy(&(bufferStrTmp[1]), itEmail->c_str(), offsetTmp);
+			sizeEmail = offsetTmp;
 		}
 
 		/* Et pour toutes les chaines de caracteres */
@@ -125,16 +163,14 @@ unsigned long	moduleThunderbirdExec(sInfoProcess &infoProcess, const sUserParam 
 				/* Cherche une correspondance parmis les strings (elles ont ete extraites de la memoire) */
 				if (infoProcess.listRWStrings.find(bufferStrBase64) != infoProcess.listRWStrings.end())
 				{
-					if (nbsResult == 0)
-						printf("  IMAP credentials:\n");
-
+					printModuleName(infoProcess);
 					printf("    " COLOR_RED "%s" COLOR_NC 
 						" : " COLOR_RED "%s" COLOR_NC 
 						" (%s)\n", itEmail->c_str(), itStr->c_str(), bufferStrBase64);
 
 					ok = 1;
 					nbsResult++;
-					setEmail.erase(itEmail++);
+					setEmailICMP.erase(itEmail++);
 					itStr = infoProcess.listRWStrings.end();
 				}
 				else
@@ -150,12 +186,11 @@ unsigned long	moduleThunderbirdExec(sInfoProcess &infoProcess, const sUserParam 
 	}
 
 	/* Affiche les emails restants */
-	for (std::set<std::string>::iterator itEmail=setEmail.begin();
-	     itEmail!=setEmail.end();
+	for (std::set<std::string>::iterator itEmail=setEmailICMP.begin();
+	     itEmail!=setEmailICMP.end();
 	     itEmail++)
 	{
-		if (nbsResult == 0)
-			printf("  IMAP credentials:\n");
+		printModuleName(infoProcess);
 		printf("    " COLOR_RED "%s" COLOR_NC "\n", itEmail->c_str());
 	}
 

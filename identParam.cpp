@@ -264,7 +264,7 @@ int	usage(const char **argv)
 {
 	printf("Usage: %s [options] [module names] [patterns]\n", argv[0]);
 	printf("\n");
-	printf("Exemples :\n");
+	printf("Examples :\n");
 	printf("  %s\n", argv[0]);
 	printf("  %s -p 1234 --thunderbird --basic-auth\n", argv[0]);
 	printf("  %s -P thunderbird 'password:'\n", argv[0]);
@@ -274,7 +274,7 @@ int	usage(const char **argv)
 	printf("Options :\n"); 
 	printf("  -d/--dump                : Dump interesting segments.\n");
 	printf("  -D/--dump-all            : Dump every segments.\n"); 
-	printf("  -f/--file <filename>     : Load and analyse the file.\n"); 
+	printf("  -f/--file <filename>     : Load and analyze the file.\n"); 
 	printf("  -F/--force               : Force execution for modules who have a \"name\" filter.\n"); 
 	printf("  -h/--help                : Print a summary of the options and exit.\n"); 
 	printf("  -p/--pid <PID>           : Analyze the process \"PID\".\n"); 

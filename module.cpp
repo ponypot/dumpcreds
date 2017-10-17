@@ -55,3 +55,27 @@ int	didUserSelectAModule(sUserParam &infoParam, const char *arg, int alreadeyHav
 	return (0);
 }
 
+/**
+** \fn int printModuleName(sInfoProcess &infoProcess)
+** \brief Gere l'affichage du nom du module si "infoProcess.ptrCurreentModule" != NULL
+**
+** \param infoProcess Structure contenant les infos du processus a analyser
+** \return Retourne 1 si on a affiche le nom du module, 0 sinon
+*/
+int		printModuleName(sInfoProcess &infoProcess)
+{
+	for (unsigned long i=0; tabInfoModule[i].fExec!=NULL; i++)
+	{
+		if (infoProcess.ptrCurrentModule == (void*)(tabInfoModule[i].fExec))
+		{
+			printf("  %s:\n", tabInfoModule[i].name);
+
+			/* Pour ne pas le reafficher */
+			infoProcess.ptrCurrentModule = NULL;
+			return (1);
+		}		
+	}
+	
+	return (0);
+}
+
