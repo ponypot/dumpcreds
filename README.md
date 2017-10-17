@@ -61,17 +61,17 @@ Modules :
 As shown in the following examples, it is possible to choose the processes to analyze and the kind of credentials to search, to work on memory dumps instead of on running processes...
 
 Result of the command "./dumpcreds --etc-shadow" (launched as root) :
-![Shadow hash](https://github.com/ponypot/dumpcreds/tree/master/screen/dumpEtcShadow.png)
+![Shadow hash](https://raw.githubusercontent.com/ponypot/dumpcreds/master/screen/dumpEtcShadow.png)
 
 Dumping thunderbird credentials :
-![Thunderbird credentials](https://github.com/ponypot/dumpcreds/tree/master/screen/dumpThunderbird1.png)
+![Thunderbird credentials](https://raw.githubusercontent.com/ponypot/dumpcreds/master/screen/dumpThunderbird1.png)
 
 It's also possible to use dump files instead of working on a process memory :
-![SMB file](https://github.com/ponypot/dumpcreds/tree/master/screen/dumpSmb.png)
+![SMB file](https://raw.githubusercontent.com/ponypot/dumpcreds/master/screen/dumpSmb.png)
 
 Extracting patterns from a file :
-![Dump from file](https://github.com/ponypot/dumpcreds/tree/master/screen/dumpFromFile.png)
+![Dump from file](https://raw.githubusercontent.com/ponypot/dumpcreds/master/screen/dumpFromFile.png)
 
 The "patterns" module may also be used to identify who is using a specific patterns by identifying the patterns addresses and searching corresponding pointers :
-![Who use it](https://github.com/ponypot/dumpcreds/tree/master/screen/dumpWhoUseIt.png)
+![Who use it](https://raw.githubusercontent.com/ponypot/dumpcreds/master/screen/dumpWhoUseIt.png)
 
