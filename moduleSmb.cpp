@@ -275,6 +275,7 @@ static unsigned long	searchNTLMSSPChallenge(std::map<std::string, sInfoChallenge
 			offset = *itItem + sizeof(magicNTLMSSPChallenge);
 
 			/* Recuperation des infos du nom du serveur */
+			memset(challenge, 0, sizeof(challenge));
 			memcpy(&infoTargetName, &(ptrContent[offset]), sizeof(sNTLMStringInfo));
 			serverName.clear();
 			if ((*itItem + infoTargetName.offset + infoTargetName.length) < sizeContent)
@@ -368,6 +369,7 @@ static unsigned long	searchNTLMSSPResponse(std::map<std::string, sInfoResponse> 
 			offset = *itItem + sizeof(magicNTLMSSPChallenge);
 
 			/* Infos Lan Manager Response */
+			memset(hashNTLM, 0, sizeof(hashNTLM));
 			memcpy(&infoData, &(ptrContent[offset]), sizeof(sNTLMStringInfo));
 			offset += sizeof(sNTLMStringInfo);
 
