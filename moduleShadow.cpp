@@ -280,11 +280,9 @@ static unsigned long	searchHashString(sInfoProcess &infoProcess, std::map<std::s
 		for (std::set<std::string>::iterator itStr=infoProcess.listRWStrings.begin();
 		     itStr!=infoProcess.listRWStrings.end(); )
 		{
-			/* Hash la chaine */
-			hashTmp = crypt(itStr->c_str(), bufferSalt);
-
 			/* Si le hash calcule correspond a celui de la liste */
-			if (itHash->first == hashTmp)
+			if ( ((hashTmp = crypt(itStr->c_str(), bufferSalt)) != NULL) &&
+			     (itHash->first == hashTmp) )
 			{
 				/* Si on a trouve le pass, on l'affiche */
 				itHash->second.password = (*itStr);
